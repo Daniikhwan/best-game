@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKYBLADE ARENA — Make the best game</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --cyan:#22d3ee; --gold:#fbbf24; --pink:#f472b6; --violet:#a855f7; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#120a2e;
+    font-family:"Segoe UI", system-ui, -apple-system, sans-serif; color:#e2e8f0; }
+  #game { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+  #fx-layer { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:5; }
+  .dmg-num { position:absolute; transform:translate(-50%,-50%); font-weight:800; font-size:22px;
+    color:#fff; text-shadow:0 0 8px rgba(34,211,238,.9), 0 2px 2px rgba(0,0,0,.8); pointer-events:none; }
+  .dmg-num.boss { color:#fbbf24; font-size:28px; text-shadow:0 0 12px rgba(168,85,247,.95), 0 2px 2px rgba(0,0,0,.8); }
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; display:none; }
+  .hud-top { position:absolute; top:14px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .hud-box { background:rgba(10,10,30,.55); border:1px solid rgba(34,211,238,.45); border-radius:12px;
+    padding:10px 14px; backdrop-filter:blur(4px); min-width:220px; }
+  .hud-label { font-size:11px; letter-spacing:.18em; color:#67e8f9; text-transform:uppercase; }
+  .hp-bar { height:16px; background:rgba(255,255,255,.12); border-radius:8px; overflow:hidden; margin-top:5px; border:1px solid rgba(255,255,255,.25); }
+  #hp-fill { height:100%; width:100%; background:linear-gradient(90deg,#22d3ee,#34d399); transition:width .15s; }
+  #hp-text { font-size:13px; margin-top:3px; color:#e0f2fe; }
+  .dash-bar { height:7px; background:rgba(255,255,255,.12); border-radius:4px; overflow:hidden; margin-top:7px; }
+  #dash-fill { height:100%; width:100%; background:linear-gradient(90deg,#f472b6,#a855f7); transition:width .1s; }
+  .dash-label { font-size:10px; letter-spacing:.14em; color:#f9a8d4; margin-top:3px; }
+  .hud-right { text-align:right; }
+  #wave-text { font-size:20px; font-weight:800; letter-spacing:.1em; color:#fff; text-shadow:0 0 12px rgba(34,211,238,.8); }
+  #foes-text { font-size:13px; color:#fca5a5; margin-top:2px; }
+  #score-text { font-size:26px; font-weight:800; color:var(--gold); text-shadow:0 0 12px rgba(251,191,36,.7); }
+  .score-label { font-size:11px; letter-spacing:.18em; color:#fde68a; }
+  #boss-bar { position:absolute; top:76px; left:50%; transform:translateX(-50%); width:min(640px,72vw); display:none; text-align:center; }
+  #boss-bar .boss-name { font-size:15px; font-weight:800; letter-spacing:.22em; color:#e9d5ff; text-shadow:0 0 12px rgba(168,85,247,.9); }
+  .boss-hp { height:14px; background:rgba(255,255,255,.12); border:1px solid rgba(168,85,247,.7); border-radius:7px; overflow:hidden; margin-top:4px; }
+  #boss-fill { height:100%; width:100%; background:linear-gradient(90deg,#7c3aed,#c026d3,#f472b6); transition:width .2s; }
+  .hud-bottom { position:absolute; bottom:14px; left:16px; font-size:12px; color:#cbd5e1;
+    background:rgba(10,10,30,.5); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:8px 12px; line-height:1.7; }
+  .hud-bottom b { color:#fff; }
+  #mute-btn { position:absolute; bottom:14px; right:16px; pointer-events:auto; cursor:pointer;
+    background:rgba(10,10,30,.6); border:1px solid rgba(34,211,238,.5); color:#a5f3fc;
+    border-radius:10px; padding:8px 14px; font-size:13px; }
+  #mute-btn:hover { background:rgba(34,211,238,.25); }
+  /* ---------- Banner ---------- */
+  #banner { position:fixed; top:22%; left:50%; transform:translate(-50%,-50%) scale(.9); text-align:center;
+    opacity:0; pointer-events:none; z-index:12; transition:opacity .3s, transform .3s; }
+  #banner.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  #banner-title { font-size:44px; font-weight:900; letter-spacing:.12em; color:#fff;
+    text-shadow:0 0 24px rgba(34,211,238,.9), 0 0 60px rgba(168,85,247,.7); }
+  #banner-sub { font-size:16px; color:#e0f2fe; margin-top:6px; text-shadow:0 2px 6px rgba(0,0,0,.7); }
+  /* ---------- Overlays ---------- */
+  .overlay { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(20,8,50,.55) 0%, rgba(8,4,24,.88) 100%); }
+  .panel { text-align:center; max-width:720px; padding:32px 40px; }
+  .game-title { font-size:64px; font-weight:900; letter-spacing:.06em; line-height:1.02;
+    background:linear-gradient(180deg,#fff 20%,#67e8f9 55%,#a855f7 90%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 22px rgba(34,211,238,.55)); }
+  .game-sub { font-size:17px; color:#e0f2fe; margin-top:12px; line-height:1.6; }
+  .game-sub b { color:var(--gold); }
+  .btn { display:inline-block; margin-top:26px; padding:14px 42px; font-size:19px; font-weight:800; letter-spacing:.08em;
+    color:#082f49; background:linear-gradient(180deg,#67e8f9,#22d3ee); border:none; border-radius:14px; cursor:pointer;
+    box-shadow:0 0 28px rgba(34,211,238,.65), 0 4px 0 #0e7490; transition:transform .08s, box-shadow .08s; }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 0 38px rgba(34,211,238,.9), 0 6px 0 #0e7490; }
+  .btn:active { transform:translateY(1px); }
+  .btn.gold { background:linear-gradient(180deg,#fde68a,#fbbf24); box-shadow:0 0 28px rgba(251,191,36,.65), 0 4px 0 #92400e; color:#451a03; }
+  .controls { margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .ctl { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:8px 12px; font-size:13px; }
+  .ctl b { color:#67e8f9; }
+  .tiny { margin-top:18px; font-size:12px; color:#94a3b8; }
+  .tiny a { color:#67e8f9; }
+  /* upgrade */
+  .up-title { font-size:30px; font-weight:900; letter-spacing:.1em; color:#fff; text-shadow:0 0 18px rgba(251,191,36,.8); }
+  .up-sub { color:#e0f2fe; margin-top:8px; }
+  .up-cards { display:flex; gap:14px; margin-top:24px; justify-content:center; flex-wrap:wrap; }
+  .up-card { width:200px; background:rgba(20,16,48,.85); border:1px solid rgba(34,211,238,.5); border-radius:16px;
+    padding:20px 14px; cursor:pointer; transition:transform .1s, box-shadow .1s, border-color .1s; }
+  .up-card:hover { transform:translateY(-4px) scale(1.03); border-color:var(--gold); box-shadow:0 0 26px rgba(251,191,36,.45); }
+  .up-icon { font-size:34px; }
+  .up-name { font-size:17px; font-weight:800; color:#fff; margin-top:8px; }
+  .up-desc { font-size:13px; color:#cbd5e1; margin-top:6px; line-height:1.5; }
+  /* victory / defeat */
+  .end-title { font-size:56px; font-weight:900; letter-spacing:.08em; }
+  .end-title.win { color:var(--gold); text-shadow:0 0 30px rgba(251,191,36,.85); }
+  .end-title.lose { color:#f87171; text-shadow:0 0 30px rgba(239,68,68,.8); }
+  .stats { display:flex; gap:12px; justify-content:center; margin-top:22px; flex-wrap:wrap; }
+  .stat { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:12px 20px; min-width:120px; }
+  .stat .v { font-size:26px; font-weight:800; color:#fff; }
+  .stat .k { font-size:11px; letter-spacing:.16em; color:#94a3b8; text-transform:uppercase; margin-top:2px; }
+  .stat .v.gold { color:var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="fx-layer"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-top">
+    <div class="hud-box">
+      <div class="hud-label">Kael · The Skyblade</div>
+      <div class="hp-bar"><div id="hp-fill"></div></div>
+      <div id="hp-text">100 / 100</div>
+      <div class="dash-bar"><div id="dash-fill"></div></div>
+      <div class="dash-label">DASH — SHIFT · READY WHEN FULL</div>
+    </div>
+    <div class="hud-box hud-right">
+      <div id="wave-text">WAVE 1 / 5</div>
+      <div id="foes-text">0 foes</div>
+      <div style="margin-top:6px"><span class="score-label">SCORE</span><br><span id="score-text">0</span></div>
+    </div>
+  </div>
+  <div id="boss-bar">
+    <div class="boss-name">⚡ VEXAR · THE STORM WYRM ⚡</div>
+    <div class="boss-hp"><div id="boss-fill"></div></div>
+  </div>
+  <div class="hud-bottom">
+    <b>WASD</b> move &nbsp;·&nbsp; <b>Mouse</b> aim &nbsp;·&nbsp; <b>Click</b> sword slash<br>
+    <b>Right-click / Space</b> energy bolt &nbsp;·&nbsp; <b>Shift</b> dash &nbsp;·&nbsp; <b>M</b> mute
+  </div>
+  <button id="mute-btn">🔊 Sound</button>
+</div>
+
+<!-- Banner -->
+<div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+
+<!-- Title -->
+<div class="overlay" id="title-screen">
+  <div class="panel">
+    <div class="game-title">SKYBLADE<br>ARENA</div>
+    <p class="game-sub">A floating crystal arena above the sunset sea. <b>Kael, the Skyblade</b>,
+      stands alone against the crystal horde — and against <b>VEXAR, the Storm Wyrm</b>.<br>
+      Survive all <b>5 waves</b>. Slay the Wyrm. Take the sky.</p>
+    <button class="btn" id="start-btn">⚔️ &nbsp;ENTER THE ARENA</button>
+    <div class="controls">
+      <span class="ctl"><b>WASD</b> move</span>
+      <span class="ctl"><b>Mouse</b> aim</span>
+      <span class="ctl"><b>Click</b> slash</span>
+      <span class="ctl"><b>R-Click / Space</b> bolt</span>
+      <span class="ctl"><b>Shift</b> dash</span>
+    </div>
+    <p class="tiny">A 3D wave arena battler · three.js · Built by an AI agent for
+      <a href="https://make.fun/bounty/best-game-01" target="_blank" rel="noopener">make.fun's “Make the best game” bounty</a></p>
+  </div>
+</div>
+
+<!-- Upgrade -->
+<div class="overlay" id="upgrade-screen" style="display:none">
+  <div class="panel">
+    <div class="up-title">WAVE CLEARED!</div>
+    <p class="up-sub">Choose a blessing before the next wave.</p>
+    <div class="up-cards">
+      <div class="up-card" data-id=""><div class="up-icon"></div><div class="up-name"></div><div class="up-desc"></div></div>
+      <div class="up-card" data-id=""><div class="up-icon"></div><div class="up-name"></div><div class="up-desc"></div></div>
+      <div class="up-card" data-id=""><div class="up-icon"></div><div class="up-name"></div><div class="up-desc"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Victory -->
+<div class="overlay" id="victory-screen" style="display:none">
+  <div class="panel">
+    <div class="end-title win">👑 VICTORY 👑</div>
+    <p class="game-sub">VEXAR falls. The storm breaks. The sky is yours, Skyblade.</p>
+    <div class="stats">
+      <div class="stat"><div class="v gold" id="win-score">0</div><div class="k">Score</div></div>
+      <div class="stat"><div class="v" id="win-waves">5 / 5</div><div class="k">Waves</div></div>
+      <div class="stat"><div class="v" id="win-kills">0</div><div class="k">Kills</div></div>
+      <div class="stat"><div class="v" id="win-time">0:00</div><div class="k">Time</div></div>
+    </div>
+    <button class="btn gold" id="again-btn">↻ &nbsp;PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- Defeat -->
+<div class="overlay" id="defeat-screen" style="display:none">
+  <div class="panel">
+    <div class="end-title lose">💀 THE SKY CLAIMS YOU 💀</div>
+    <p class="game-sub">The crystal horde endures… this time. Sharpen your blade and return.</p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="lose-wave">Wave 1</div><div class="k">Reached</div></div>
+      <div class="stat"><div class="v gold" id="lose-score">0</div><div class="k">Score</div></div>
+      <div class="stat"><div class="v" id="lose-kills">0</div><div class="k">Kills</div></div>
+    </div>
+    <button class="btn" id="retry-btn">⚔️ &nbsp;TRY AGAIN</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
